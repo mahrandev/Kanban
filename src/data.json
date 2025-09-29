@@ -1,0 +1,49 @@
+{
+  "boards": [
+    {
+      "name": "Platform Launch",
+      "columns": [
+        {
+          "name": "Todo",
+          "tasks": [
+            {
+              "title": "Build UI for onboarding flow",
+              "description": "",
+              "status": "Todo",
+              "subtasks": [
+                { "title": "Sign up page", "isCompleted": true },
+                { "title": "Sign in page", "isCompleted": false },
+                { "title": "Welcome page", "isCompleted": false }
+              ]
+            },
+            {
+              "title": "Build UI for search",
+              "description": "",
+              "status": "Todo",
+              "subtasks": [{ "title": "Search page", "isCompleted": false }]
+            }
+          ]
+        },
+        {
+          "name": "Doing",
+          "tasks": [
+            {
+              "title": "Design settings and search pages",
+              "description": "",
+              "status": "Doing",
+              "subtasks": [
+                { "title": "Settings - Account page", "isCompleted": true },
+                { "title": "Settings - Billing page", "isCompleted": true },
+                { "title": "Search page", "isCompleted": false }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Done",
+          "tasks": []
+        }
+      ]
+    }
+  ]
+}
