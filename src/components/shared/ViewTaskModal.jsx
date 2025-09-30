@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
-function ViewTaskModal({ task, isOpen, onClose, onEditClick }) {
+function ViewTaskModal({ task, isOpen, onClose, onEditClick, onDeleteClick }) {
   if (!task) return null;
 
   const completedSubtasks = task.subtasks.filter(
@@ -21,6 +21,9 @@ function ViewTaskModal({ task, isOpen, onClose, onEditClick }) {
           <DialogTitle className="text-lg font-bold">{task.title}</DialogTitle>
           <Button variant="secondary" onClick={onEditClick}>
             Edit Task
+          </Button>
+          <Button variant="destructive" onClick={onDeleteClick}>
+            Delete
           </Button>
 
           <DialogDescription className="text-gray-400 pt-4">

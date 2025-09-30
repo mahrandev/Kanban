@@ -3,7 +3,7 @@ import { useState } from "react";
 import Column from "./Column";
 import ViewTaskModal from "./ViewTaskModal";
 
-function Board({ board, setEditingTask }) {
+function Board({ board, setEditingTask, onDeleteTaskClick }) {
   const [viewingTask, setViewingTask] = useState(null); // State للمهمة المعروضة
 
   return (
@@ -21,6 +21,10 @@ function Board({ board, setEditingTask }) {
         onClose={() => setViewingTask(null)}
         onEditClick={() => {
           setEditingTask(viewingTask); // قم بتعيين المهمة للتعديل
+          setViewingTask(null); // أغلق مودال العرض
+        }}
+        onDeleteClick={() => {
+          onDeleteTaskClick(viewingTask); // قم بتعيين المهمة للحذف
           setViewingTask(null); // أغلق مودال العرض
         }}
       />

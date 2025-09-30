@@ -9,12 +9,14 @@ import { useState } from "react";
 import data from "./data.json";
 import AddTaskModal from "./components/shared/AddTaskModal";
 import EditTaskModal from "./components/shared/EditTaskModal";
+import DeleteModal from "./components/shared/DeleteModal";
 
 function App() {
   const [boards, setBoards] = useState(data.boards);
   const [activeBoard, setActiveBoard] = useState(boards[0]);
   const [isAddTaskModalOpen, setAddTaskModalOpen] = useState(false); // State لإدارة المودال
   const [editingTask, setEditingTask] = useState(null);
+  const [taskToDelete, setTaskToDelete] = useState(null); // State لإدارة مهمة الحذف
 
   const handleAddTask = (newTask) => {
     // العثور على اللوحة والعمود المناسبين
@@ -75,6 +77,27 @@ function App() {
     setBoards(newBoards);
     setActiveBoard(newBoards.find((b) => b.name === activeBoard.name));
   };
+  const handleDeleteTask = () => {
+    if (!taskToDelete) return;
+
+    const newBoards = JSON.parse(JSON.stringify(boards));
+    const activeBoardRef = newBoards.find((b) => b.name === activeBoard.name);
+
+    // ابحث عن العمود الذي يحتوي على المهمة وقم بحذفها
+    for (const column of activeBoardRef.columns) {
+      const taskIndex = column.tasks.findIndex(
+        (t) => t.title === taskToDelete.title
+      ); // البحث بالعنوان مؤقتاً
+      if (taskIndex !== -1) {
+        column.tasks.splice(taskIndex, 1);
+        break; // اخرج من اللوب بعد الحذف
+      }
+    }
+
+    setBoards(newBoards);
+    setActiveBoard(newBoards.find((b) => b.name === activeBoard.name));
+    setTaskToDelete(null); // أغلق المودال
+  };
 
   const taskToEdit = (() => {
     if (!editingTask) return null;
@@ -100,7 +123,12 @@ function App() {
           boardName={activeBoard.name}
           onAddTaskClick={() => setAddTaskModalOpen(true)}
         />
-        <Board board={activeBoard} setEditingTask={setEditingTask} />
+        <Board
+          board={activeBoard}
+          // setViewingTask={setViewingTask}
+          setEditingTask={setEditingTask}
+          onDeleteTaskClick={(task) => setTaskToDelete(task)}
+        />
       </main>
       <AddTaskModal
         isOpen={isAddTaskModalOpen}
@@ -114,6 +142,13 @@ function App() {
         columns={activeBoard.columns}
         taskToEdit={taskToEdit}
         onEditTask={handleEditTask}
+      />
+      <DeleteModal
+        isOpen={!!taskToDelete}
+        onClose={() => setTaskToDelete(null)}
+        onConfirm={handleDeleteTask}
+        title="Delete this task?"
+        description={`Are you sure you want to delete the ‘${taskToDelete?.title}’ task and its subtasks? This action cannot be reversed.`}
       />
     </div>
   );
