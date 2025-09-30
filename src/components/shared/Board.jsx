@@ -1,34 +1,20 @@
 // src/components/shared/Board.jsx
-import { useState } from "react";
 import Column from "./Column";
-import ViewTaskModal from "./ViewTaskModal";
 
-function Board({ board, setEditingTask, onDeleteTaskClick }) {
-  const [viewingTask, setViewingTask] = useState(null); // State للمهمة المعروضة
-
+// يستقبل فقط board و setViewingTask
+function Board({ board, setViewingTask }) {
+  // لا يوجد أي state هنا
   return (
-    <>
-      <section className="flex-1 p-6 flex space-x-6 overflow-x-auto">
-        {board.columns.map((column, index) => (
-          // تمرير دالة setViewingTask إلى الأسفل
-          <Column key={index} column={column} setViewingTask={setViewingTask} />
-        ))}
-      </section>
-
-      <ViewTaskModal
-        task={viewingTask}
-        isOpen={!!viewingTask}
-        onClose={() => setViewingTask(null)}
-        onEditClick={() => {
-          setEditingTask(viewingTask); // قم بتعيين المهمة للتعديل
-          setViewingTask(null); // أغلق مودال العرض
-        }}
-        onDeleteClick={() => {
-          onDeleteTaskClick(viewingTask); // قم بتعيين المهمة للحذف
-          setViewingTask(null); // أغلق مودال العرض
-        }}
-      />
-    </>
+    <section className="flex-1 p-6 flex space-x-6 overflow-x-auto">
+      {/* التأكد من وجود board قبل محاولة الوصول لأعمدته */}
+      {board?.columns.map((column, index) => (
+        <Column
+          key={index}
+          column={column}
+          setViewingTask={setViewingTask} // تمرير الدالة للأسفل
+        />
+      ))}
+    </section>
   );
 }
 export default Board;
