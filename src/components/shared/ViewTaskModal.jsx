@@ -5,8 +5,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
-function ViewTaskModal({ task, isOpen, onClose }) {
+function ViewTaskModal({ task, isOpen, onClose, onEditClick }) {
   if (!task) return null;
 
   const completedSubtasks = task.subtasks.filter(
@@ -18,6 +19,10 @@ function ViewTaskModal({ task, isOpen, onClose }) {
       <DialogContent className="bg-[#2B2C37] border-none text-white">
         <DialogHeader>
           <DialogTitle className="text-lg font-bold">{task.title}</DialogTitle>
+          <Button variant="secondary" onClick={onEditClick}>
+            Edit Task
+          </Button>
+
           <DialogDescription className="text-gray-400 pt-4">
             {task.description || "No description for this task."}
           </DialogDescription>
