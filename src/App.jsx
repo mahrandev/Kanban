@@ -1,70 +1,70 @@
 // src/App.jsx
 
+import { useState, useEffect } from "react"; // ◀️ 1. تأكد من استيراد useEffect
 import "./App.css";
 import Sidebar from "./components/shared/Sidebar";
 import Header from "./components/shared/Header";
 import Board from "./components/shared/Board";
-import { useState } from "react";
-// لاحظ أني غيرت مسار الاستيراد ليتوافق مع هيكل المجلدات
 import data from "./data.json";
 import AddTaskModal from "./components/shared/AddTaskModal";
 import EditTaskModal from "./components/shared/EditTaskModal";
 import DeleteModal from "./components/shared/DeleteModal";
 
 function App() {
-  const [boards, setBoards] = useState(data.boards);
-  const [activeBoard, setActiveBoard] = useState(boards[0]);
-  const [isAddTaskModalOpen, setAddTaskModalOpen] = useState(false); // State لإدارة المودال
-  const [editingTask, setEditingTask] = useState(null);
-  const [taskToDelete, setTaskToDelete] = useState(null); // State لإدارة مهمة الحذف
+  // 🔽 2. تعديل useState لقراءة البيانات عند البدء 🔽
+  const [boards, setBoards] = useState(() => {
+    const savedBoards = localStorage.getItem("kanbanBoards");
+    return savedBoards ? JSON.parse(savedBoards) : data.boards;
+  });
 
+  const [activeBoard, setActiveBoard] = useState(boards[0]);
+
+  // ... (كل الـ states الأخرى: isAddTaskModalOpen, viewingTask, etc.)
+  const [isAddTaskModalOpen, setAddTaskModalOpen] = useState(false);
+    const [viewingTask, setViewingTask] = useState(null);
+  const [editingTask, setEditingTask] = useState(null);
+  const [taskToDelete, setTaskToDelete] = useState(null);
+
+  // ◀️ 3. إضافة useEffect لحفظ البيانات عند أي تغيير في boards
+  useEffect(() => {
+    localStorage.setItem("kanbanBoards", JSON.stringify(boards));
+    // تحديث اللوحة النشطة في حال تغيرت البيانات
+    const currentActive =
+      boards.find((b) => b.name === activeBoard?.name) || boards[0];
+    setActiveBoard(currentActive);
+  }, [boards]);
+
+  // ... (كل دوال الـ handlers: handleAddTask, handleEditTask, handleDeleteTask)
+  // لا يوجد أي تغيير في هذه الدوال
   const handleAddTask = (newTask) => {
-    // العثور على اللوحة والعمود المناسبين
     const boardIndex = boards.findIndex((b) => b.name === activeBoard.name);
     const columnIndex = boards[boardIndex].columns.findIndex(
       (c) => c.name === newTask.status
     );
-
-    // إنشاء نسخة جديدة من الحالة لتجنب التعديل المباشر (immutability)
     const newBoards = JSON.parse(JSON.stringify(boards));
     newBoards[boardIndex].columns[columnIndex].tasks.push(newTask);
-
     setBoards(newBoards);
-    // تحديث اللوحة النشطة لتعكس التغيير
-    setActiveBoard(newBoards[boardIndex]);
   };
+
   const handleEditTask = (updatedTask) => {
     const newBoards = JSON.parse(JSON.stringify(boards));
     const activeBoardRef = newBoards.find((b) => b.name === activeBoard.name);
-
     let originalColumn = null;
     let taskIndex = -1;
-
-    // الخطوة 1: ابحث عن المهمة ومكانها الأصلي
     for (const col of activeBoardRef.columns) {
-      const index = col.tasks.findIndex((t) => t.title === editingTask.title); // استخدم `editingTask` لتجد المهمة الأصلية
+      const index = col.tasks.findIndex((t) => t.title === editingTask.title);
       if (index !== -1) {
         originalColumn = col;
         taskIndex = index;
         break;
       }
     }
-
-    // إذا لم يتم العثور على المهمة، لا تفعل شيئاً (حالة أمان)
     if (!originalColumn) return;
-
     const originalStatus = originalColumn.name;
-
-    // الخطوة 2: تحقق إذا تغيرت الحالة (Status)
     if (originalStatus === updatedTask.status) {
-      // إذا لم تتغير الحالة، فقط قم بتحديث المهمة في مكانها
       originalColumn.tasks[taskIndex] = updatedTask;
     } else {
-      // إذا تغيرت الحالة، انقل المهمة
-      // احذفها من العمود القديم
       originalColumn.tasks.splice(taskIndex, 1);
-
-      // أضفها إلى العمود الجديد
       const newColumn = activeBoardRef.columns.find(
         (c) => c.name === updatedTask.status
       );
@@ -72,31 +72,24 @@ function App() {
         newColumn.tasks.push(updatedTask);
       }
     }
-
-    // الخطوة 3: قم بتحديث الحالة ليعاد رسم الواجهة
     setBoards(newBoards);
-    setActiveBoard(newBoards.find((b) => b.name === activeBoard.name));
   };
+
   const handleDeleteTask = () => {
     if (!taskToDelete) return;
-
     const newBoards = JSON.parse(JSON.stringify(boards));
     const activeBoardRef = newBoards.find((b) => b.name === activeBoard.name);
-
-    // ابحث عن العمود الذي يحتوي على المهمة وقم بحذفها
     for (const column of activeBoardRef.columns) {
       const taskIndex = column.tasks.findIndex(
         (t) => t.title === taskToDelete.title
-      ); // البحث بالعنوان مؤقتاً
+      );
       if (taskIndex !== -1) {
         column.tasks.splice(taskIndex, 1);
-        break; // اخرج من اللوب بعد الحذف
+        break;
       }
     }
-
     setBoards(newBoards);
-    setActiveBoard(newBoards.find((b) => b.name === activeBoard.name));
-    setTaskToDelete(null); // أغلق المودال
+    setTaskToDelete(null);
   };
 
   const taskToEdit = (() => {
@@ -118,28 +111,29 @@ function App() {
         setActiveBoard={setActiveBoard}
       />
       <main className="flex-1">
-        {/* تمرير دالة لفتح المودال */}
         <Header
-          boardName={activeBoard.name}
+          boardName={activeBoard?.name}
           onAddTaskClick={() => setAddTaskModalOpen(true)}
         />
         <Board
           board={activeBoard}
-          // setViewingTask={setViewingTask}
+          setViewingTask={setViewingTask}
           setEditingTask={setEditingTask}
           onDeleteTaskClick={(task) => setTaskToDelete(task)}
         />
       </main>
+
+      {/* Modals */}
       <AddTaskModal
         isOpen={isAddTaskModalOpen}
         onClose={() => setAddTaskModalOpen(false)}
-        columns={activeBoard.columns}
+        columns={activeBoard?.columns || []}
         onAddTask={handleAddTask}
       />
       <EditTaskModal
         isOpen={!!editingTask}
         onClose={() => setEditingTask(null)}
-        columns={activeBoard.columns}
+        columns={activeBoard?.columns || []}
         taskToEdit={taskToEdit}
         onEditTask={handleEditTask}
       />
