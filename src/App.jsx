@@ -2,95 +2,108 @@
 
 import { useState, useEffect } from "react";
 import "./App.css";
+import { supabase } from "./lib/supabaseClient";
+import Auth from "./components/Auth";
 import Sidebar from "./components/shared/Sidebar";
 import Header from "./components/shared/Header";
 import Board from "./components/shared/Board";
-import data from "./data.json";
 import AddTaskModal from "./components/shared/AddTaskModal";
 import ViewTaskModal from "./components/shared/ViewTaskModal";
 import EditTaskModal from "./components/shared/EditTaskModal";
 import DeleteModal from "./components/shared/DeleteModal";
 
+// ===================================================================
+// 1. المكون الرئيسي: مسؤول فقط عن المصادقة (Authentication)
+// ===================================================================
 function App() {
-  const [boards, setBoards] = useState(() => {
-    const savedBoards = localStorage.getItem("kanbanBoards");
-    try {
-      const parsedBoards = JSON.parse(savedBoards);
-      return Array.isArray(parsedBoards) && parsedBoards.length > 0
-        ? parsedBoards
-        : data.boards;
-    } catch (e) {
-      return data.boards;
-    }
-  });
-
-  const [activeBoard, setActiveBoard] = useState(boards[0]);
-  const [isAddTaskModalOpen, setAddTaskModalOpen] = useState(false);
-  const [viewingTask, setViewingTask] = useState(null);
-  const [editingTask, setEditingTask] = useState(null); // هذا هو مصدر الحقيقة للتعديل
-  const [taskToDelete, setTaskToDelete] = useState(null);
+  const [session, setSession] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    localStorage.setItem("kanbanBoards", JSON.stringify(boards));
-    const currentActive =
-      boards.find((b) => b.name === activeBoard?.name) || boards[0];
-    setActiveBoard(currentActive);
-  }, [boards, activeBoard?.name]);
+    // جلب الجلسة عند تحميل التطبيق
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setLoading(false); // انتهاء التحميل بعد جلب الجلسة
+    });
 
-  const handleAddTask = (newTask) => {
-    const newBoards = JSON.parse(JSON.stringify(boards));
-    const board = newBoards.find((b) => b.name === activeBoard.name);
-    const column = board.columns.find((c) => c.name === newTask.status);
-    column.tasks.push(newTask);
-    setBoards(newBoards);
-  };
+    // الاستماع لأي تغيير في حالة المصادقة
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
 
-  const handleEditTask = (updatedTask) => {
-    const newBoards = JSON.parse(JSON.stringify(boards));
-    const board = newBoards.find((b) => b.name === activeBoard.name);
+    return () => subscription.unsubscribe();
+  }, []);
 
-    // حذف المهمة من مكانها القديم
-    let oldColumn = null;
-    for (const col of board.columns) {
-      const taskIndex = col.tasks.findIndex(
-        (t) => t.title === editingTask.title
-      ); // استخدم `editingTask` للبحث عن النسخة الأصلية
-      if (taskIndex !== -1) {
-        oldColumn = col;
-        oldColumn.tasks.splice(taskIndex, 1);
-        break;
+  // لا تعرض شيئاً حتى نتأكد من حالة تسجيل الدخول
+  if (loading) {
+    return null;
+  }
+
+  // عرض الواجهة بناءً على حالة الجلسة
+  if (!session) {
+    return <Auth />;
+  } else {
+    // `key` هنا مهمة جداً لضمان إعادة تحميل التطبيق عند تغيير المستخدم
+    return <KanbanApp key={session.user.id} />;
+  }
+}
+
+// ===================================================================
+// 2. مكون التطبيق: مسؤول فقط عن منطق Kanban
+// ===================================================================
+function KanbanApp() {
+  const [boards, setBoards] = useState([]);
+  const [activeBoard, setActiveBoard] = useState(null);
+  const [loadingBoards, setLoadingBoards] = useState(true);
+
+  // States الخاصة بالنوافذ المنبثقة
+  const [isAddTaskModalOpen, setAddTaskModalOpen] = useState(false);
+  const [viewingTask, setViewingTask] = useState(null);
+  const [editingTask, setEditingTask] = useState(null);
+  const [taskToDelete, setTaskToDelete] = useState(null);
+
+  // useEffect لجلب البيانات من Supabase عند تحميل المكون
+  useEffect(() => {
+    const fetchBoards = async () => {
+      setLoadingBoards(true);
+      // استعلام لجلب كل البيانات المترابطة للمستخدم الحالي
+      const { data: boardsData, error } = await supabase
+        .from("boards")
+        .select("*, columns(*, tasks(*, subtasks(*)))");
+
+      if (error) {
+        console.error("Error fetching boards:", error);
+      } else {
+        setBoards(boardsData);
+        if (boardsData && boardsData.length > 0) {
+          setActiveBoard(boardsData[0]);
+        }
       }
-    }
+      setLoadingBoards(false);
+    };
 
-    // إضافة المهمة المحدثة إلى مكانها الجديد
-    const newColumn = board.columns.find((c) => c.name === updatedTask.status);
-    if (newColumn) {
-      newColumn.tasks.push(updatedTask);
-    }
+    fetchBoards();
+  }, []); // [] تعني أن هذا سيعمل مرة واحدة فقط
 
-    setBoards(newBoards);
-    setEditingTask(null); // أغلق المودال بعد الحفظ
-  };
+  // دوال وهمية مؤقتة (Placeholders) - سنقوم بتحديثها في الخطوات القادمة
+  const handleAddTask = (newTask) => console.log("Adding task:", newTask);
+  const handleEditTask = (updatedTask) =>
+    console.log("Editing task:", updatedTask);
+  const handleDeleteTask = () => console.log("Deleting task...");
 
-  const handleDeleteTask = () => {
-    if (!taskToDelete) return;
-    const newBoards = JSON.parse(JSON.stringify(boards));
-    const board = newBoards.find((b) => b.name === activeBoard.name);
-    for (const column of board.columns) {
-      const taskIndex = column.tasks.findIndex(
-        (t) => t.title === taskToDelete.title
-      );
-      if (taskIndex !== -1) {
-        column.tasks.splice(taskIndex, 1);
-        break;
-      }
-    }
-    setBoards(newBoards);
-    setTaskToDelete(null);
-  };
+  // عرض رسالة تحميل بينما يتم جلب بيانات الألواح
+  if (loadingBoards) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#20212C] text-2xl text-white">
+        Loading Your Boards...
+      </div>
+    );
+  }
 
   return (
-    <div className="bg-[#20212C] min-h-screen flex">
+    <div className="flex min-h-screen bg-[#20212C]">
       <Sidebar
         boards={boards}
         activeBoard={activeBoard}
@@ -128,7 +141,7 @@ function App() {
         isOpen={!!editingTask}
         onClose={() => setEditingTask(null)}
         columns={activeBoard?.columns || []}
-        taskToEdit={editingTask} // ✅ نستخدم الحالة مباشرة
+        taskToEdit={editingTask}
         onEditTask={handleEditTask}
       />
       <DeleteModal
@@ -136,7 +149,7 @@ function App() {
         onClose={() => setTaskToDelete(null)}
         onConfirm={handleDeleteTask}
         title="Delete this task?"
-        description={`Are you sure you want to delete the ‘${taskToDelete?.title}’ task and its subtasks? This action cannot be reversed.`}
+        description={`Are you sure you want to delete the ‘${taskToDelete?.title}’ task? This action cannot be reversed.`}
       />
     </div>
   );

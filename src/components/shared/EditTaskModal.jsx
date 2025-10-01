@@ -74,27 +74,31 @@ function EditTaskModal({ isOpen, onClose, columns, taskToEdit, onEditTask }) {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-[#2B2C37] border-none text-white">
+      <DialogContent className="border-none bg-[#2B2C37] text-white">
         <DialogHeader>
           <DialogTitle>Edit Task</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div>
-            <Label className="mb-2" htmlFor="title">Title</Label>
+            <Label className="mb-2" htmlFor="title">
+              Title
+            </Label>
             <Input
               id="title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="bg-[#20212C] border-gray-600"
+              className="border-gray-600 bg-[#20212C]"
             />
           </div>
           <div>
-            <Label className="mb-2" htmlFor="description">Description</Label>
+            <Label className="mb-2" htmlFor="description">
+              Description
+            </Label>
             <Textarea
               id="description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="bg-[#20212C] border-gray-600"
+              className="border-gray-600 bg-[#20212C]"
             />
           </div>
           <div>
@@ -105,7 +109,7 @@ function EditTaskModal({ isOpen, onClose, columns, taskToEdit, onEditTask }) {
                   <Input
                     value={sub}
                     onChange={(e) => handleSubtaskChange(index, e.target.value)}
-                    className="bg-[#20212C] border-gray-600"
+                    className="border-gray-600 bg-[#20212C]"
                   />
                   <Button
                     variant="destructive"
@@ -119,15 +123,17 @@ function EditTaskModal({ isOpen, onClose, columns, taskToEdit, onEditTask }) {
             </div>
             <Button
               onClick={addSubtask}
-              className="w-full mt-2 bg-white text-[#635FC7] hover:bg-gray-200"
+              className="mt-2 w-full bg-white text-[#635FC7] hover:bg-gray-200"
             >
               + Add New Subtask
             </Button>
           </div>
           <div>
-            <Label className="mb-2" htmlFor="status">Status</Label>
+            <Label className="mb-2" htmlFor="status">
+              Status
+            </Label>
             <Select onValueChange={setStatus} value={status}>
-              <SelectTrigger className="bg-[#20212C] border-gray-600">
+              <SelectTrigger className="border-gray-600 bg-[#20212C]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-[#2B2C37] text-white">
