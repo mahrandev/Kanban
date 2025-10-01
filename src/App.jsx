@@ -88,11 +88,102 @@ function KanbanApp() {
   }, []); // [] تعني أن هذا سيعمل مرة واحدة فقط
 
   // دوال وهمية مؤقتة (Placeholders) - سنقوم بتحديثها في الخطوات القادمة
-  const handleAddTask = (newTask) => console.log("Adding task:", newTask);
+  const handleAddTask = async (newTaskData) => {
+    // 1. ابحث عن الـ ID الخاص بالعمود المحدد من الحالة المحلية
+    const column = activeBoard.columns.find(
+      (c) => c.name === newTaskData.status,
+    );
+    if (!column) return;
+
+    // 2. أنشئ المهمة الجديدة في جدول 'tasks'
+    const { data: newTask, error: taskError } = await supabase
+      .from("tasks")
+      .insert({
+        title: newTaskData.title,
+        description: newTaskData.description,
+        status: newTaskData.status,
+        column_id: column.id,
+      })
+      .select()
+      .single();
+
+    if (taskError) {
+      console.error("Error creating task:", taskError);
+      return;
+    }
+
+    // 3. إذا كانت هناك مهام فرعية، أنشئها في جدول 'subtasks'
+    if (newTaskData.subtasks.length > 0) {
+      const subtasksToInsert = newTaskData.subtasks.map((sub) => ({
+        title: sub.title,
+        is_completed: false,
+        task_id: newTask.id, // اربطها بالـ ID الخاص بالمهمة الجديدة
+      }));
+
+      const { error: subtaskError } = await supabase
+        .from("subtasks")
+        .insert(subtasksToInsert);
+
+      if (subtaskError) {
+        console.error("Error creating subtasks:", subtaskError);
+      }
+    }
+
+    // 4. تحديث الحالة المحلية فوراً (Optimistic Update)
+    const newBoards = JSON.parse(JSON.stringify(boards));
+    const board = newBoards.find((b) => b.name === activeBoard.name);
+    const targetColumn = board.columns.find(
+      (c) => c.name === newTaskData.status,
+    );
+    targetColumn.tasks.push({ ...newTask, subtasks: newTaskData.subtasks }); // أضف المهمة الجديدة للواجهة
+    setBoards(newBoards);
+  };
   const handleEditTask = (updatedTask) =>
     console.log("Editing task:", updatedTask);
   const handleDeleteTask = () => console.log("Deleting task...");
 
+  const handleCreateBoard = async () => {
+    // 1. احصل على المستخدم الحالي
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    // 2. أنشئ لوحة جديدة واربطها بالمستخدم
+    const { data: newBoard, error: boardError } = await supabase
+      .from("boards")
+      .insert({ name: "My First Board", user_id: user.id })
+      .select()
+      .single(); // .select().single() يجعل Supabase يرجع البيانات التي تم إنشاؤها
+
+    if (boardError) {
+      console.error("Error creating board:", boardError);
+      return;
+    }
+
+    // 3. أنشئ أعمدة افتراضية لهذه اللوحة
+    const { error: columnsError } = await supabase.from("columns").insert([
+      { name: "Todo", board_id: newBoard.id },
+      { name: "Doing", board_id: newBoard.id },
+      { name: "Done", board_id: newBoard.id },
+    ]);
+
+    if (columnsError) {
+      console.error("Error creating columns:", columnsError);
+    } else {
+      // 4. قم بتحديث الحالة المحلية لتعرض اللوحة الجديدة فوراً
+      setBoards([
+        ...boards,
+        {
+          ...newBoard,
+          columns: [
+            { name: "Todo", tasks: [] },
+            { name: "Doing", tasks: [] },
+            { name: "Done", tasks: [] },
+          ],
+        },
+      ]);
+    }
+  };
   // عرض رسالة تحميل بينما يتم جلب بيانات الألواح
   if (loadingBoards) {
     return (
@@ -101,7 +192,19 @@ function KanbanApp() {
       </div>
     );
   }
-
+  if (boards.length === 0) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-[#20212C] text-white">
+        <h2 className="mb-4 text-2xl">You don't have any boards yet.</h2>
+        <button
+          onClick={handleCreateBoard}
+          className="rounded-full bg-[#635FC7] px-6 py-3 font-bold text-white hover:bg-[#A8A4FF]"
+        >
+          + Create Your First Board
+        </button>
+      </div>
+    );
+  }
   return (
     <div className="flex min-h-screen bg-[#20212C]">
       <Sidebar
