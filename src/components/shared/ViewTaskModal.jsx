@@ -7,50 +7,45 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
-function ViewTaskModal({ task, isOpen, onClose, onEditClick, onDeleteClick }) {
+function ViewTaskModal({
+  task,
+  isOpen,
+  onClose,
+  onEditClick,
+  onDeleteClick,
+  onSubtaskToggle,
+}) {
   if (!task) return null;
 
   const completedSubtasks = task.subtasks.filter(
-    (sub) => sub.isCompleted
+    (sub) => sub.is_completed,
   ).length;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-[#2B2C37] border-none text-white">
-        <DialogHeader>
-          <DialogTitle className="text-lg font-bold">{task.title}</DialogTitle>
-          <Button variant="secondary" onClick={onEditClick}>
-            Edit Task
-          </Button>
-          <Button variant="destructive" onClick={onDeleteClick}>
-            Delete
-          </Button>
-
-          <DialogDescription className="text-gray-400 pt-4">
-            {task.description || "No description for this task."}
-          </DialogDescription>
-        </DialogHeader>
-
+      <DialogContent className="border-none bg-[#2B2C37] text-white">
+        {/* ... (DialogHeader) ... */}
         <div className="mt-4">
-          <h3 className="text-gray-400 font-bold text-sm">
+          <h3 className="text-sm font-bold text-gray-400">
             Subtasks ({completedSubtasks} of {task.subtasks.length})
           </h3>
-          <ul className="mt-2 space-y-2 bg-[#20212C] p-4 rounded">
-            {task.subtasks.map((subtask, index) => (
+          <ul className="mt-2 space-y-2 rounded bg-[#20212C] p-4">
+            {task.subtasks.map((subtask) => (
               <li
-                key={index}
-                className="flex items-center bg-[#2B2C37] p-3 rounded"
+                key={subtask.id}
+                className="flex items-center rounded bg-[#2B2C37] p-3"
               >
                 <input
                   type="checkbox"
-                  checked={subtask.isCompleted}
-                  readOnly // سنجعلها تفاعلية لاحقاً
-                  className="mr-3"
+                  checked={subtask.is_completed}
+                  // ✨ تفعيل الـ checkbox
+                  onChange={(e) =>
+                    onSubtaskToggle(subtask.id, e.target.checked)
+                  }
+                  className="mr-3 h-4 w-4"
                 />
                 <span
-                  className={`${
-                    subtask.isCompleted ? "line-through text-gray-500" : ""
-                  }`}
+                  className={`${subtask.is_completed ? "text-gray-500 line-through" : ""}`}
                 >
                   {subtask.title}
                 </span>

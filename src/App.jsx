@@ -20,13 +20,11 @@ function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // جلب الجلسة عند تحميل التطبيق
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      setLoading(false); // انتهاء التحميل بعد جلب الجلسة
+      setLoading(false);
     });
 
-    // الاستماع لأي تغيير في حالة المصادقة
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -36,16 +34,13 @@ function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // لا تعرض شيئاً حتى نتأكد من حالة تسجيل الدخول
   if (loading) {
     return null;
   }
 
-  // عرض الواجهة بناءً على حالة الجلسة
   if (!session) {
     return <Auth />;
   } else {
-    // `key` هنا مهمة جداً لضمان إعادة تحميل التطبيق عند تغيير المستخدم
     return <KanbanApp key={session.user.id} />;
   }
 }
@@ -57,45 +52,75 @@ function KanbanApp() {
   const [boards, setBoards] = useState([]);
   const [activeBoard, setActiveBoard] = useState(null);
   const [loadingBoards, setLoadingBoards] = useState(true);
-
-  // States الخاصة بالنوافذ المنبثقة
   const [isAddTaskModalOpen, setAddTaskModalOpen] = useState(false);
   const [viewingTask, setViewingTask] = useState(null);
   const [editingTask, setEditingTask] = useState(null);
   const [taskToDelete, setTaskToDelete] = useState(null);
 
-  // useEffect لجلب البيانات من Supabase عند تحميل المكون
-  useEffect(() => {
-    const fetchBoards = async () => {
-      setLoadingBoards(true);
-      // استعلام لجلب كل البيانات المترابطة للمستخدم الحالي
-      const { data: boardsData, error } = await supabase
-        .from("boards")
-        .select("*, columns(*, tasks(*, subtasks(*)))");
+  const fetchBoards = async () => {
+    // لا نعرض شاشة التحميل عند كل إعادة جلب، فقط في المرة الأولى
+    if (boards.length === 0) setLoadingBoards(true);
 
-      if (error) {
-        console.error("Error fetching boards:", error);
-      } else {
-        setBoards(boardsData);
-        if (boardsData && boardsData.length > 0) {
-          setActiveBoard(boardsData[0]);
-        }
+    const { data: boardsData, error } = await supabase
+      .from("boards")
+      .select("*, columns(*, tasks(*, subtasks(*)))");
+
+    if (error) {
+      console.error("Error fetching boards:", error);
+    } else {
+      setBoards(boardsData);
+      // تحديث اللوحة النشطة والمودال المفتوح بالبيانات الجديدة
+      if (boardsData && boardsData.length > 0) {
+        setActiveBoard(
+          (currentActive) =>
+            boardsData.find((b) => b.id === currentActive?.id) || boardsData[0],
+        );
+        setViewingTask((currentTask) => {
+          if (!currentTask) return null;
+          // ابحث عن النسخة المحدثة من المهمة المعروضة
+          for (const board of boardsData) {
+            for (const col of board.columns) {
+              const task = col.tasks.find((t) => t.id === currentTask.id);
+              if (task) return task;
+            }
+          }
+          return null;
+        });
       }
-      setLoadingBoards(false);
-    };
+    }
+    setLoadingBoards(false);
+  };
 
+  useEffect(() => {
     fetchBoards();
-  }, []); // [] تعني أن هذا سيعمل مرة واحدة فقط
+  }, []);
 
-  // دوال وهمية مؤقتة (Placeholders) - سنقوم بتحديثها في الخطوات القادمة
+  const handleCreateBoard = async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const { data: newBoard, error: boardError } = await supabase
+      .from("boards")
+      .insert({ name: "My First Board", user_id: user.id })
+      .select()
+      .single();
+    if (boardError) {
+      console.error("Error creating board:", boardError);
+      return;
+    }
+    await supabase.from("columns").insert([
+      { name: "Todo", board_id: newBoard.id },
+      { name: "Doing", board_id: newBoard.id },
+      { name: "Done", board_id: newBoard.id },
+    ]);
+    await fetchBoards();
+  };
+
   const handleAddTask = async (newTaskData) => {
-    // 1. ابحث عن الـ ID الخاص بالعمود المحدد من الحالة المحلية
     const column = activeBoard.columns.find(
       (c) => c.name === newTaskData.status,
     );
     if (!column) return;
-
-    // 2. أنشئ المهمة الجديدة في جدول 'tasks'
     const { data: newTask, error: taskError } = await supabase
       .from("tasks")
       .insert({
@@ -106,85 +131,41 @@ function KanbanApp() {
       })
       .select()
       .single();
-
     if (taskError) {
       console.error("Error creating task:", taskError);
       return;
     }
-
-    // 3. إذا كانت هناك مهام فرعية، أنشئها في جدول 'subtasks'
     if (newTaskData.subtasks.length > 0) {
       const subtasksToInsert = newTaskData.subtasks.map((sub) => ({
         title: sub.title,
         is_completed: false,
-        task_id: newTask.id, // اربطها بالـ ID الخاص بالمهمة الجديدة
+        task_id: newTask.id,
       }));
-
-      const { error: subtaskError } = await supabase
-        .from("subtasks")
-        .insert(subtasksToInsert);
-
-      if (subtaskError) {
-        console.error("Error creating subtasks:", subtaskError);
-      }
+      await supabase.from("subtasks").insert(subtasksToInsert);
     }
-
-    // 4. تحديث الحالة المحلية فوراً (Optimistic Update)
-    const newBoards = JSON.parse(JSON.stringify(boards));
-    const board = newBoards.find((b) => b.name === activeBoard.name);
-    const targetColumn = board.columns.find(
-      (c) => c.name === newTaskData.status,
-    );
-    targetColumn.tasks.push({ ...newTask, subtasks: newTaskData.subtasks }); // أضف المهمة الجديدة للواجهة
-    setBoards(newBoards);
+    await fetchBoards();
   };
+
+  // 🔽🔽🔽 هذا هو الإصلاح النهائي لدالة تحديث المهمة الفرعية 🔽🔽🔽
+  const handleSubtaskToggle = async (subtaskId, newStatus) => {
+    const { error } = await supabase
+      .from("subtasks")
+      .update({ is_completed: newStatus })
+      .eq("id", subtaskId);
+
+    if (error) {
+      console.error("Error updating subtask:", error);
+    } else {
+      // بعد التحديث الناجح، قم بإعادة جلب كل البيانات
+      // هذا يضمن أن كل شيء (المودال والبطاقات) يعرض أحدث البيانات
+      await fetchBoards();
+    }
+  };
+
   const handleEditTask = (updatedTask) =>
     console.log("Editing task:", updatedTask);
   const handleDeleteTask = () => console.log("Deleting task...");
 
-  const handleCreateBoard = async () => {
-    // 1. احصل على المستخدم الحالي
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    // 2. أنشئ لوحة جديدة واربطها بالمستخدم
-    const { data: newBoard, error: boardError } = await supabase
-      .from("boards")
-      .insert({ name: "My First Board", user_id: user.id })
-      .select()
-      .single(); // .select().single() يجعل Supabase يرجع البيانات التي تم إنشاؤها
-
-    if (boardError) {
-      console.error("Error creating board:", boardError);
-      return;
-    }
-
-    // 3. أنشئ أعمدة افتراضية لهذه اللوحة
-    const { error: columnsError } = await supabase.from("columns").insert([
-      { name: "Todo", board_id: newBoard.id },
-      { name: "Doing", board_id: newBoard.id },
-      { name: "Done", board_id: newBoard.id },
-    ]);
-
-    if (columnsError) {
-      console.error("Error creating columns:", columnsError);
-    } else {
-      // 4. قم بتحديث الحالة المحلية لتعرض اللوحة الجديدة فوراً
-      setBoards([
-        ...boards,
-        {
-          ...newBoard,
-          columns: [
-            { name: "Todo", tasks: [] },
-            { name: "Doing", tasks: [] },
-            { name: "Done", tasks: [] },
-          ],
-        },
-      ]);
-    }
-  };
-  // عرض رسالة تحميل بينما يتم جلب بيانات الألواح
   if (loadingBoards) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#20212C] text-2xl text-white">
@@ -205,6 +186,7 @@ function KanbanApp() {
       </div>
     );
   }
+
   return (
     <div className="flex min-h-screen bg-[#20212C]">
       <Sidebar
@@ -219,8 +201,6 @@ function KanbanApp() {
         />
         <Board board={activeBoard} setViewingTask={setViewingTask} />
       </main>
-
-      {/* === Modals Section === */}
       <AddTaskModal
         isOpen={isAddTaskModalOpen}
         onClose={() => setAddTaskModalOpen(false)}
@@ -239,6 +219,7 @@ function KanbanApp() {
           setTaskToDelete(viewingTask);
           setViewingTask(null);
         }}
+        onSubtaskToggle={handleSubtaskToggle}
       />
       <EditTaskModal
         isOpen={!!editingTask}

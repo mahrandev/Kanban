@@ -2,7 +2,7 @@
 
 function TaskCard({ task, setViewingTask }) {
   const completedSubtasks = task.subtasks.filter(
-    (sub) => sub.isCompleted
+    (sub) => sub.is_completed
   ).length;
 
   return (
