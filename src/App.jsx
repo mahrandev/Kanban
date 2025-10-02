@@ -162,10 +162,66 @@ function KanbanApp() {
     }
   };
 
-  const handleEditTask = (updatedTask) =>
-    console.log("Editing task:", updatedTask);
-  const handleDeleteTask = () => console.log("Deleting task...");
+  const handleEditTask = async (updatedTaskData) => {
+    if (!editingTask) return;
 
+    // 1. ابحث عن الـ ID الخاص بالعمود الجديد
+    const newColumn = activeBoard.columns.find(
+      (c) => c.name === updatedTaskData.status,
+    );
+    if (!newColumn) return;
+
+    // 2. قم بتحديث بيانات المهمة الأساسية في جدول 'tasks'
+    const { error: updateError } = await supabase
+      .from("tasks")
+      .update({
+        title: updatedTaskData.title,
+        description: updatedTaskData.description,
+        status: updatedTaskData.status,
+        column_id: newColumn.id, // حدّث الـ column_id إذا تغيرت الحالة
+      })
+      .eq("id", editingTask.id); // حدد المهمة التي تريد تعديلها
+
+    if (updateError) {
+      console.error("Error updating task:", updateError);
+      return;
+    }
+
+    // 3. تعامل مع المهام الفرعية (الأفضل حذف القديم وإضافة الجديد لضمان التوافق)
+    // أولاً: احذف كل المهام الفرعية القديمة المرتبطة بالمهمة
+    await supabase.from("subtasks").delete().eq("task_id", editingTask.id);
+
+    // ثانياً: أضف المهام الفرعية الجديدة
+    if (updatedTaskData.subtasks.length > 0) {
+      const subtasksToInsert = updatedTaskData.subtasks.map((sub) => ({
+        title: sub.title,
+        is_completed: sub.is_completed || false, // احتفظ بالحالة القديمة إن وجدت
+        task_id: editingTask.id,
+      }));
+      await supabase.from("subtasks").insert(subtasksToInsert);
+    }
+
+    // 4. بعد نجاح كل العمليات، أغلق المودال وأعد جلب البيانات
+    setEditingTask(null);
+    await fetchBoards();
+  };
+  const handleDeleteTask = async () => {
+    if (!taskToDelete) return;
+
+    // 1. احذف المهمة من جدول 'tasks'
+    const { error } = await supabase
+      .from("tasks")
+      .delete()
+      .eq("id", taskToDelete.id); // حدد المهمة التي تريد حذفها بالـ id
+
+    if (error) {
+      console.error("Error deleting task:", error);
+    } else {
+      // 2. إذا نجح الحذف، أغلق المودال وأعد جلب البيانات
+      setTaskToDelete(null);
+      await fetchBoards();
+    }
+  };
   if (loadingBoards) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#20212C] text-2xl text-white">
