@@ -13,6 +13,7 @@ import EditTaskModal from "./components/shared/EditTaskModal";
 import DeleteModal from "./components/shared/DeleteModal";
 import { DndContext, DragOverlay } from "@dnd-kit/core";
 import TaskCard from "./components/shared/TaskCard";
+import AddBoardModal from "./components/shared/AddBoardModal";
 
 // ===================================================================
 // 1. المكون الرئيسي: مسؤول فقط عن المصادقة (Authentication)
@@ -59,6 +60,8 @@ function KanbanApp() {
   const [editingTask, setEditingTask] = useState(null);
   const [taskToDelete, setTaskToDelete] = useState(null);
   const [activeTask, setActiveTask] = useState(null); //
+  const [isAddBoardModalOpen, setAddBoardModalOpen] = useState(false); // ✨ State جديد للمودال
+
   //
   //  ✨ State جديد للعنصر المسحوب
 
@@ -100,24 +103,31 @@ function KanbanApp() {
     fetchBoards();
   }, []);
 
-  const handleCreateBoard = async () => {
+  const handleCreateBoard = async (boardName, columnNames) => {
     const {
       data: { user },
     } = await supabase.auth.getUser();
+
+    // 1. أنشئ اللوح
     const { data: newBoard, error: boardError } = await supabase
       .from("boards")
-      .insert({ name: "My First Board", user_id: user.id })
+      .insert({ name: boardName, user_id: user.id })
       .select()
       .single();
+
     if (boardError) {
-      console.error("Error creating board:", boardError);
+      console.error(boardError);
       return;
     }
-    await supabase.from("columns").insert([
-      { name: "Todo", board_id: newBoard.id },
-      { name: "Doing", board_id: newBoard.id },
-      { name: "Done", board_id: newBoard.id },
-    ]);
+
+    // 2. أنشئ الأعمدة المرتبطة به
+    const columnsToInsert = columnNames.map((name) => ({
+      name,
+      board_id: newBoard.id,
+    }));
+    await supabase.from("columns").insert(columnsToInsert);
+
+    // 3. أعد جلب البيانات
     await fetchBoards();
   };
 
@@ -299,6 +309,7 @@ function KanbanApp() {
           boards={boards}
           activeBoard={activeBoard}
           setActiveBoard={setActiveBoard}
+          onAddBoardClick={() => setAddBoardModalOpen(true)}
         />
         <main className="flex flex-1 flex-col">
           <Header
@@ -346,6 +357,11 @@ function KanbanApp() {
             <TaskCard task={activeTask} setViewingTask={() => {}} />
           ) : null}
         </DragOverlay>
+        <AddBoardModal
+          isOpen={isAddBoardModalOpen}
+          onClose={() => setAddBoardModalOpen(false)}
+          onCreateBoard={handleCreateBoard}
+        />
       </div>
     </DndContext>
   );
