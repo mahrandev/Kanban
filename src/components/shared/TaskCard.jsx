@@ -3,7 +3,6 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
-
 function TaskCard({ task, setViewingTask }) {
   const {
     attributes,
@@ -11,7 +10,7 @@ function TaskCard({ task, setViewingTask }) {
     setNodeRef,
     transform,
     transition,
-    isDragging, // خاصية لمعرفة ما إذا كان العنصر يُسحب حالياً
+    isDragging,
   } = useSortable({
     id: task.id,
     data: { task },
@@ -20,7 +19,6 @@ function TaskCard({ task, setViewingTask }) {
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    // اجعل العنصر الأصلي شبه شفاف أثناء السحب لتحسين التجربة
     opacity: isDragging ? 0.5 : 1,
   };
 
@@ -33,15 +31,43 @@ function TaskCard({ task, setViewingTask }) {
       ref={setNodeRef}
       style={style}
       {...attributes}
-      {...listeners}
-      // ✨ هذا هو مفتاح الحل: لا تقم بتشغيل onClick إذا كان المستخدم يسحب
-      onClick={() => !isDragging && setViewingTask(task)}
-      className="cursor-grab touch-none rounded-lg bg-[#2B2C37] p-4 shadow-md active:cursor-grabbing"
+      onClick={() => setViewingTask(task)}
+      className="cursor-pointer rounded-lg bg-[#2B2C37] p-4 shadow-md"
     >
-      <h3 className="mb-2 font-bold text-white">{task.title}</h3>
-      <p className="text-xs font-bold text-gray-400">
-        {completedSubtasks} of {task.subtasks.length} subtasks
-      </p>
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex-1">
+          <h3 className="mb-2 font-bold text-white">{task.title}</h3>
+          <p className="text-xs font-bold text-gray-400">
+            {completedSubtasks} of {task.subtasks.length} subtasks
+          </p>
+        </div>
+        <div
+          {...listeners}
+          className="cursor-grab rounded p-1 hover:bg-white/10 active:cursor-grabbing"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            className="text-gray-400"
+          >
+            <circle cx="12" cy="5" r="1" />
+            <circle cx="12" cy="12" r="1" />
+            <circle cx="12" cy="19" r="1" />
+            <circle cx="19" cy="5" r="1" />
+            <circle cx="19" cy="12" r="1" />
+            <circle cx="19" cy="19" r="1" />
+            <circle cx="5" cy="5" r="1" />
+            <circle cx="5" cy="12" r="1" />
+            <circle cx="5" cy="19" r="1" />
+          </svg>
+        </div>
+      </div>
     </li>
   );
 }
