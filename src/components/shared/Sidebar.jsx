@@ -1,4 +1,5 @@
 // src/components/shared/Sidebar.jsx
+import ThemeToggle from "./ThemeToggle"; // ✨ استيراد المكون الجديد
 
 // نستقبل الـ props الجديدة
 function Sidebar({ boards, activeBoard, setActiveBoard, onAddBoardClick }) {
@@ -8,15 +9,13 @@ function Sidebar({ boards, activeBoard, setActiveBoard, onAddBoardClick }) {
       <h2 className="mb-4 text-xs font-bold tracking-widest text-gray-400">
         ALL BOARDS ({boards.length})
       </h2>
-      <ul>
+      <ul className="mb-4 flex-1">
         {boards.map((board) => (
           <li
-            key={board.name} // استخدام الاسم كمفتاح فريد مؤقتاً
-            // إضافة دالة onClick لتغيير اللوحة النشطة
+            key={board.id} // ✨ استخدم الـ ID الفريد بدلاً من الاسم
             onClick={() => setActiveBoard(board)}
             className={`cursor-pointer rounded-r-full p-3 font-bold text-white ${
-              // مقارنة الكائن مباشرة لتحديد العنصر النشط
-              activeBoard.name === board.name
+              activeBoard?.id === board.id
                 ? "bg-[#635FC7]"
                 : "hover:bg-white/10"
             }`}
@@ -31,6 +30,9 @@ function Sidebar({ boards, activeBoard, setActiveBoard, onAddBoardClick }) {
       >
         + Create New Board
       </button>
+      <div className="mt-auto">
+        <ThemeToggle />
+      </div>
     </aside>
   );
 }

@@ -14,6 +14,7 @@ import DeleteModal from "./components/shared/DeleteModal";
 import { DndContext, DragOverlay } from "@dnd-kit/core";
 import TaskCard from "./components/shared/TaskCard";
 import AddBoardModal from "./components/shared/AddBoardModal";
+import EditBoardModal from "./components/shared/EditBoardModal";
 
 // ===================================================================
 // 1. المكون الرئيسي: مسؤول فقط عن المصادقة (Authentication)
@@ -61,7 +62,8 @@ function KanbanApp() {
   const [taskToDelete, setTaskToDelete] = useState(null);
   const [activeTask, setActiveTask] = useState(null); //
   const [isAddBoardModalOpen, setAddBoardModalOpen] = useState(false); // ✨ State جديد للمودال
-
+  const [isEditBoardModalOpen, setEditBoardModalOpen] = useState(false);
+  const [isDeleteBoardModalOpen, setDeleteBoardModalOpen] = useState(false);
   //
   //  ✨ State جديد للعنصر المسحوب
 
@@ -281,6 +283,45 @@ function KanbanApp() {
     }
   };
 
+  const handleEditBoard = async (newName, newColumns) => {
+    // 1. تحديث اسم اللوح
+    await supabase
+      .from("boards")
+      .update({ name: newName })
+      .eq("id", activeBoard.id);
+
+    // 2. تحديث، إضافة، وحذف الأعمدة
+    const oldColumns = activeBoard.columns;
+    const toUpdate = newColumns.filter((c) => c.id);
+    const toAdd = newColumns.filter((c) => !c.id);
+    const toDelete = oldColumns.filter(
+      (oc) => !newColumns.some((nc) => nc.id === oc.id),
+    );
+
+    if (toUpdate.length > 0) await supabase.from("columns").upsert(toUpdate);
+    if (toAdd.length > 0)
+      await supabase
+        .from("columns")
+        .insert(toAdd.map((c) => ({ name: c.name, board_id: activeBoard.id })));
+    if (toDelete.length > 0)
+      await supabase
+        .from("columns")
+        .delete()
+        .in(
+          "id",
+          toDelete.map((c) => c.id),
+        );
+
+    await fetchBoards();
+  };
+
+  // ✨ دالة لحذف اللوح
+  const handleDeleteBoard = async () => {
+    await supabase.from("boards").delete().eq("id", activeBoard.id);
+    setDeleteBoardModalOpen(false);
+    await fetchBoards();
+  };
+
   if (loadingBoards) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#20212C] text-2xl text-white">
@@ -315,7 +356,10 @@ function KanbanApp() {
           <Header
             boardName={activeBoard?.name}
             onAddTaskClick={() => setAddTaskModalOpen(true)}
+            onEditBoardClick={() => setEditBoardModalOpen(true)}
+            onDeleteBoardClick={() => setDeleteBoardModalOpen(true)}
           />
+
           <Board board={activeBoard} setViewingTask={setViewingTask} />
         </main>
         <AddTaskModal
@@ -361,6 +405,19 @@ function KanbanApp() {
           isOpen={isAddBoardModalOpen}
           onClose={() => setAddBoardModalOpen(false)}
           onCreateBoard={handleCreateBoard}
+        />
+        <EditBoardModal
+          isOpen={isEditBoardModalOpen}
+          onClose={() => setEditBoardModalOpen(false)}
+          boardToEdit={activeBoard}
+          onEditBoard={handleEditBoard}
+        />
+        <DeleteModal
+          isOpen={isDeleteBoardModalOpen}
+          onClose={() => setDeleteBoardModalOpen(false)}
+          onConfirm={handleDeleteBoard}
+          title="Delete this board?"
+          description={`Are you sure you want to delete the ‘${activeBoard?.name}’ board? This action will remove all columns and tasks and cannot be reversed.`}
         />
       </div>
     </DndContext>
