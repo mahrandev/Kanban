@@ -11,6 +11,8 @@ import AddTaskModal from "./components/shared/AddTaskModal";
 import ViewTaskModal from "./components/shared/ViewTaskModal";
 import EditTaskModal from "./components/shared/EditTaskModal";
 import DeleteModal from "./components/shared/DeleteModal";
+import { DndContext, DragOverlay } from "@dnd-kit/core";
+import TaskCard from "./components/shared/TaskCard";
 
 // ===================================================================
 // 1. المكون الرئيسي: مسؤول فقط عن المصادقة (Authentication)
@@ -56,6 +58,9 @@ function KanbanApp() {
   const [viewingTask, setViewingTask] = useState(null);
   const [editingTask, setEditingTask] = useState(null);
   const [taskToDelete, setTaskToDelete] = useState(null);
+  const [activeTask, setActiveTask] = useState(null); //
+  //
+  //  ✨ State جديد للعنصر المسحوب
 
   const fetchBoards = async () => {
     // لا نعرض شاشة التحميل عند كل إعادة جلب، فقط في المرة الأولى
@@ -222,6 +227,50 @@ function KanbanApp() {
       await fetchBoards();
     }
   };
+
+  const handleDragStart = (event) => {
+    const { active } = event;
+    // ابحث عن المهمة النشطة وضعها في الـ state
+    for (const board of boards) {
+      for (const col of board.columns) {
+        const task = col.tasks.find((t) => t.id === active.id);
+        if (task) {
+          setActiveTask(task);
+          return;
+        }
+      }
+    }
+  };
+  const handleDragEnd = async (event) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) {
+      return;
+    }
+
+    // 1. ابحث عن العمود الجديد الذي تم الإفلات فيه
+    const destColumn = activeBoard.columns.find(
+      (col) => col.id === over.id || col.tasks.some((t) => t.id === over.id),
+    );
+
+    if (!destColumn) return;
+
+    // 2. قم بتحديث المهمة في قاعدة بيانات Supabase
+    const { error } = await supabase
+      .from("tasks")
+      .update({
+        column_id: destColumn.id,
+        status: destColumn.name,
+      })
+      .eq("id", active.id); // `active.id` هو id المهمة التي تم سحبها
+
+    // 3. إذا نجح التحديث، أعد جلب البيانات لتحديث الواجهة
+    if (!error) {
+      await fetchBoards();
+    } else {
+      console.error("Error updating task position:", error);
+    }
+  };
+
   if (loadingBoards) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#20212C] text-2xl text-white">
@@ -244,54 +293,61 @@ function KanbanApp() {
   }
 
   return (
-    <div className="flex min-h-screen bg-[#20212C]">
-      <Sidebar
-        boards={boards}
-        activeBoard={activeBoard}
-        setActiveBoard={setActiveBoard}
-      />
-      <main className="flex-1">
-        <Header
-          boardName={activeBoard?.name}
-          onAddTaskClick={() => setAddTaskModalOpen(true)}
+    <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <div className="flex min-h-screen bg-[#20212C]">
+        <Sidebar
+          boards={boards}
+          activeBoard={activeBoard}
+          setActiveBoard={setActiveBoard}
         />
-        <Board board={activeBoard} setViewingTask={setViewingTask} />
-      </main>
-      <AddTaskModal
-        isOpen={isAddTaskModalOpen}
-        onClose={() => setAddTaskModalOpen(false)}
-        columns={activeBoard?.columns || []}
-        onAddTask={handleAddTask}
-      />
-      <ViewTaskModal
-        task={viewingTask}
-        isOpen={!!viewingTask}
-        onClose={() => setViewingTask(null)}
-        onEditClick={() => {
-          setEditingTask(viewingTask);
-          setViewingTask(null);
-        }}
-        onDeleteClick={() => {
-          setTaskToDelete(viewingTask);
-          setViewingTask(null);
-        }}
-        onSubtaskToggle={handleSubtaskToggle}
-      />
-      <EditTaskModal
-        isOpen={!!editingTask}
-        onClose={() => setEditingTask(null)}
-        columns={activeBoard?.columns || []}
-        taskToEdit={editingTask}
-        onEditTask={handleEditTask}
-      />
-      <DeleteModal
-        isOpen={!!taskToDelete}
-        onClose={() => setTaskToDelete(null)}
-        onConfirm={handleDeleteTask}
-        title="Delete this task?"
-        description={`Are you sure you want to delete the ‘${taskToDelete?.title}’ task? This action cannot be reversed.`}
-      />
-    </div>
+        <main className="flex flex-1 flex-col">
+          <Header
+            boardName={activeBoard?.name}
+            onAddTaskClick={() => setAddTaskModalOpen(true)}
+          />
+          <Board board={activeBoard} setViewingTask={setViewingTask} />
+        </main>
+        <AddTaskModal
+          isOpen={isAddTaskModalOpen}
+          onClose={() => setAddTaskModalOpen(false)}
+          columns={activeBoard?.columns || []}
+          onAddTask={handleAddTask}
+        />
+        <ViewTaskModal
+          task={viewingTask}
+          isOpen={!!viewingTask}
+          onClose={() => setViewingTask(null)}
+          onEditClick={() => {
+            setEditingTask(viewingTask);
+            setViewingTask(null);
+          }}
+          onDeleteClick={() => {
+            setTaskToDelete(viewingTask);
+            setViewingTask(null);
+          }}
+          onSubtaskToggle={handleSubtaskToggle}
+        />
+        <EditTaskModal
+          isOpen={!!editingTask}
+          onClose={() => setEditingTask(null)}
+          columns={activeBoard?.columns || []}
+          taskToEdit={editingTask}
+          onEditTask={handleEditTask}
+        />
+        <DeleteModal
+          isOpen={!!taskToDelete}
+          onClose={() => setTaskToDelete(null)}
+          onConfirm={handleDeleteTask}
+          title="Delete this task?"
+          description={`Are you sure you want to delete the ‘${taskToDelete?.title}’ task? This action cannot be reversed.`}
+        />
+        <DragOverlay>
+          {activeTask ? (
+            <TaskCard task={activeTask} setViewingTask={() => {}} />
+          ) : null}
+        </DragOverlay>
+      </div>
+    </DndContext>
   );
 }
 
